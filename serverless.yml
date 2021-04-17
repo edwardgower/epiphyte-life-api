@@ -1,0 +1,130 @@
+service: epiphyte-life-api
+
+frameworkVersion: "2"
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  lambdaHashingVersion: 20201221
+  region: us-west-2
+  profile: serverless-admin
+  stage: dev
+  httpApi:
+    cors: true
+    authorizers:
+      serviceAuthorizer:
+        identitySource: $request.header.Authorization
+        issuerUrl: "https://cognito-idp.${opt:region, self:provider.region}.amazonaws.com/us-west-2_v2q9gO0Jc"
+        audience: 4p2f5q5rcrp9b7gpe4rgrd63ra
+
+  # you can define service wide environment variables here
+  environment:
+    DYNAMODB_TABLE_CASES: epiphyte-life-cases
+    DYNAMODB_TABLE_APPLICATIONS: epiphyte-life-applications
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_CASES}"
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE_APPLICATIONS}"
+
+functions:
+  create:
+    handler: cases/create.create
+    name: epiphyte-life-dev-cases-create
+    events:
+      - httpApi:
+          method: POST
+          path: /life/cases
+          authorizer: serviceAuthorizer
+  list:
+    handler: cases/list.list
+    name: epiphyte-life-dev-cases-list
+    events:
+      - httpApi:
+          method: GET
+          path: /life/cases
+          authorizer: serviceAuthorizer
+  get:
+    handler: cases/get.get
+    name: epiphyte-life-dev-cases-get
+    events:
+      - httpApi:
+          method: GET
+          path: /life/cases/{id}
+          authorizer: serviceAuthorizer
+  update:
+    handler: cases/update.update
+    name: epiphyte-life-dev-cases-update
+    events:
+      - httpApi:
+          method: PATCH
+          path: /life/cases/{id}
+          authorizer: serviceAuthorizer
+  delete:
+    handler: cases/delete.delete
+    name: epiphyte-life-dev-cases-delete
+    events:
+      - httpApi:
+          method: DELETE
+          path: /life/cases/{id}
+          authorizer: serviceAuthorizer
+
+#    Define function environment variables here
+#    environment:
+#      variable2: value2
+
+resources:
+  Resources:
+    CasesDynamoDbTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: CaseId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: CaseId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_CASES}
+    ApplicationsDynamoDbTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: ApplicationId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ApplicationId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TableName: ${self:provider.environment.DYNAMODB_TABLE_APPLICATIONS}
+plugins:
+  - serverless-domain-manager
+
+custom:
+  customDomain:
+    domainName: "api.epiphytehealth.com"
+    basePath: ""
+    certificateName: "*.epiphytehealth.com"
+    stage: ${self:provider.stage}
+    createRoute53Record: false
+    endpointType: "regional"
+    apiType: http
